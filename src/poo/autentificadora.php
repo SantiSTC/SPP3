@@ -30,7 +30,7 @@ class Autentificadora
         try 
         {
             if(!isset($token)) {
-                $datos->mensaje = "Token vacío!!!";
+                $datos->mensaje = "Token vacio.";
             } else {          
                 $decode = JWT::decode(
                     $token,
@@ -39,16 +39,16 @@ class Autentificadora
                 );
 
                 if($decode->aud !== self::aud()) {
-                    throw new Exception("Usuario inválido!!!");
+                    throw new Exception("Usuario invalido.");
                 } else {
                     $datos->verificado = TRUE;
-                    $datos->mensaje = "Token OK!!!";
+                    $datos->mensaje = "Token correcto.";
                 } 
             }          
         } 
         catch (Exception $e) 
         {
-            $datos->mensaje = "Token inválido!!! - " . $e->getMessage();
+            $datos->mensaje = "Token invalido. - " . $e->getMessage();
         }
     
         return $datos;

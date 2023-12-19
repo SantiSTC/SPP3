@@ -7,55 +7,51 @@ require_once "accesoDatos.php";
 require_once __DIR__ . "/autentificadora.php";
 
 class MW {
-    public static function ValidarParametrosVacios(Request $request, RequestHandler $handler): ResponseMW {
+    public static function ValidarParamVacios(Request $request, RequestHandler $handler): ResponseMW {
         $contenidoAPI = "";
 
-        $parametros = $request->getParsedBody();
+        $params = $request->getParsedBody();
 
-        $objetoRetorno = new stdclass();
-        $objetoRetorno->mensaje = "Hay un parametro vacio";
-        $objetoRetorno->status = 409;
+        $objRetorno = new stdclass();
+        $objRetorno->mensaje = "Error";
+        $objRetorno->status = 409;
 
-        if(isset($parametros['user'])) {
-            $objetoUsuario = json_decode($parametros['user']);
+        if(isset($params['user']) || isset($params['usuario'])){
+            $objUsuario = isset($params['user']) != null ? json_decode($params['user']) : json_decode($params['usuario']);
 
-            if($objetoUsuario){
-                if($objetoUsuario->correo != "" && $objetoUsuario->clave != "") {
+            if($objUsuario){
+                if($objUsuario->correo != "" && $objUsuario->clave != ""){
                     $response = $handler->handle($request);
                     $contenidoAPI = (string) $response->getBody();
                     $api_respuesta = json_decode($contenidoAPI);
-                    $objetoRetorno->status = $api_respuesta->status;
+                    $objRetorno->status = $api_respuesta->status;
                 } else {
                     $mensajeError = "Parametros vacios: ";
-
-                    if($objetoUsuario->correo == "")
-                    {
-                        $mensajeError.= "correo - ";
+                    if($objUsuario->correo == ""){
+                        $mensajeError.= "Correo - ";
                     }
-
-                    if($objetoUsuario->clave == "")
-                    {
-                        $mensajeError.= "clave";
+                    if($objUsuario->clave == ""){
+                        $mensajeError.= "Clave - ";
                     }
-
-                    $objetoRetorno->mensaje = $mensajeError;
-                    $contenidoAPI = json_encode($objetoRetorno);
+                    $objRetorno->mensaje = $mensajeError;
+                    $contenidoAPI = json_encode($objRetorno);
                 }
             }
-
-            $response = new ResponseMW();
-            $response = $response->withStatus($objetoRetorno->status);
-            $response->getBody()->write($contenidoAPI);
-
-            return $response->withHeader('Content-Type', 'application/json');
+        } else {
+            $objRetorno->mensaje = "Error, Usuario o Contraseña vacios.";
+            $contenidoAPI = json_encode($objRetorno);
         }
+        $response = new ResponseMW();
+        $response = $response->withStatus($objRetorno->status);
+        $response->getBody()->write($contenidoAPI);
+        return $response->withHeader('Content-Type', 'application/json');
     }
 
-    public function ValidarCorreoYClaveExistentes(Request $request, RequestHandler $handler): ResponseMW {
+    public function ValidarCorreoYClaveExisten(Request $request, RequestHandler $handler): ResponseMW {
         $parametros = $request->getParsedBody();
 
         $objetoRetorno = new stdclass();
-        $objetoRetorno->mensaje = "El correo y la clave no existen";
+        $objetoRetorno->mensaje = "El correo o la clave son inexistentes.";
         $objetoRetorno->status = 403;
         $objetoUsuario = null;
 
@@ -63,8 +59,8 @@ class MW {
             $objetoUsuario = json_decode($parametros['user']);
 
             if(Usuario::verificar($objetoUsuario)) {
-                $response = $handler->handle($request);
-                $contenidoAPI = (string) $response->getBody();
+                $retorno = $handler->handle($request);
+                $contenidoAPI = (string) $retorno->getBody();
                 $api_respuesta = json_decode($contenidoAPI);
                 $objetoRetorno->status = $api_respuesta->status;
             } else {
@@ -72,11 +68,11 @@ class MW {
             }
         }
 
-        $response = new ResponseMW();
-        $response = $response->withStatus($objetoRetorno->status);
-        $response->getBody()->write($contenidoAPI);
+        $retorno = new ResponseMW();
+        $retorno = $retorno->withStatus($objetoRetorno->status);
+        $retorno->getBody()->write($contenidoAPI);
 
-        return $response->withHeader('Content-Type', 'application/json');
+        return $retorno->withHeader('Content-Type', 'application/json');
     }
 
     public function ValidarToken(Request $request, RequestHandler $handler): ResponseMW {
@@ -91,8 +87,8 @@ class MW {
             $obj = Autentificadora::verificarJWT($token);
 
             if ($obj->verificado) {
-                $response = $handler->handle($request);
-                $contenidoAPI = (string) $response->getBody();
+                $retorno = $handler->handle($request);
+                $contenidoAPI = (string) $retorno->getBody();
                 $api_respuesta = json_decode($contenidoAPI);
                 $objetoRetorno->status = $api_respuesta->status;
             } else {
@@ -102,17 +98,17 @@ class MW {
             $objetoRetorno->mensaje = $obj;
         }
 
-        $response = new ResponseMW();
-        $response = $response->withStatus($objetoRetorno->status);
-        $response->getBody()->write($contenidoAPI);
+        $retorno = new ResponseMW();
+        $retorno = $retorno->withStatus($objetoRetorno->status);
+        $retorno->getBody()->write($contenidoAPI);
 
-        return $response->withHeader('Content-Type', 'application/json');
+        return $retorno->withHeader('Content-Type', 'application/json');
     }
 
-    public static function ListarTablaUsuariosGet(Request $request, RequestHandler $handler): ResponseMW {
+    public static function ListarUsuarios_Get(Request $request, RequestHandler $handler): ResponseMW {
         $objetoRetorno = new stdclass();
         $objetoRetorno->exito = false;
-        $objetoRetorno->mensaje = "No se pudo traer la lista";
+        $objetoRetorno->mensaje = "Error al intentar traer la lista de usuarios.";
         $objetoRetorno->tabla = "null";
         $objetoRetorno->status = 424;
 
@@ -129,17 +125,48 @@ class MW {
             $objetoRetorno->status = 200;
         }
 
-        $response = new ResponseMW();
-        $response = $response->withStatus($objetoRetorno->status);
-        $response->getBody()->write(json_encode($objetoRetorno));
+        $retorno = new ResponseMW();
+        $retorno = $retorno->withStatus($objetoRetorno->status);
+        $retorno->getBody()->write(json_encode($objetoRetorno));
 
-        return $response->withHeader('Content-Type', 'application/json');	
+        return $retorno->withHeader('Content-Type', 'application/json');	
     }
 
-    public static function ListarTablaUsuariosPost(Request $request, RequestHandler $handler): ResponseMW {
+    public function ListarJuguetes_Get(Request $request, RequestHandler $handler): ResponseMW {
+        $listaJuguetesImpares = array();
+
         $objetoRetorno = new stdclass();
         $objetoRetorno->exito = false;
-        $objetoRetorno->mensaje = "No se pudo listar";
+        $objetoRetorno->mensaje = "Error al intentar traer la lista";
+        $objetoRetorno->tablaData = "null";
+        $objetoRetorno->status = 424;
+
+		$listaJuguetes = Juguete::traer();
+
+        if(count($listaJuguetes) > 0) {
+            foreach($listaJuguetes as $juguete) {
+                if($juguete->id % 2 != 0) {
+                    array_push($listaJuguetesImpares, $juguete);
+                }
+            }
+
+            $objetoRetorno->exito = true;
+            $objetoRetorno->mensaje = "Tabla de juguetes";
+            $objetoRetorno->tablaData = MW::ArmarTabla($listaJuguetesImpares, "<tr><th>ID</th><th>MARCA</th><th>PRECIO</th><th>FOTO</th></tr>");
+            $objetoRetorno->status = 200; 
+        }
+
+        $retorno = new ResponseMW();
+        $retorno = $retorno->withStatus($objetoRetorno->status);
+        $retorno->getBody()->write(json_encode($objetoRetorno));
+
+        return $retorno->withHeader('Content-Type', 'application/json');	
+    }
+
+    public static function ListarUsuarios_Post(Request $request, RequestHandler $handler): ResponseMW {
+        $objetoRetorno = new stdclass();
+        $objetoRetorno->exito = false;
+        $objetoRetorno->mensaje = "Error al intentar listar.";
         $objetoRetorno->status = 403;
 
         if(isset($request->getHeader('token')[0])){
@@ -166,46 +193,15 @@ class MW {
                 }
             } else {
 
-                $objetoRetorno->mensaje = "No esta autorizado para listar usuarios, debe ser propietario y usted es {$usuarioToken->perfil}";
+                $objetoRetorno->mensaje = "No tiene autorizacion para listar usuarios, se necesita ser propietario y usted es: {$usuarioToken->perfil}";
             }
         }
 
-        $response = new ResponseMW();
-        $response = $response->withStatus($objetoRetorno->status);
-        $response->getBody()->write(json_encode($objetoRetorno));
+        $retorno = new ResponseMW();
+        $retorno = $retorno->withStatus($objetoRetorno->status);
+        $retorno->getBody()->write(json_encode($objetoRetorno));
 
-        return $response->withHeader('Content-Type', 'application/json');	
-    }
-
-    public function ListarTablaJuguetesGet(Request $request, RequestHandler $handler): ResponseMW {
-        $listaJuguetesImpares = array();
-
-        $objetoRetorno = new stdclass();
-        $objetoRetorno->exito = false;
-        $objetoRetorno->mensaje = "No se pudo traer la lista";
-        $objetoRetorno->tabla = "null";
-        $objetoRetorno->status = 424;
-
-		$listaJuguetes = Juguete::traer();
-
-        if(count($listaJuguetes) > 0) {
-            foreach($listaJuguetes as $juguete) {
-                if($juguete->id % 2 != 0) {
-                    array_push($listaJuguetesImpares, $juguete);
-                }
-            }
-
-            $objetoRetorno->exito = true;
-            $objetoRetorno->mensaje = "Tabla de juguetes";
-            $objetoRetorno->tabla = MW::ArmarTabla($listaJuguetesImpares, "<tr><th>ID</th><th>MARCA</th><th>PRECIO</th><th>FOTO</th></tr>");
-            $objetoRetorno->status = 200; 
-        }
-
-        $response = new ResponseMW();
-        $response = $response->withStatus($objetoRetorno->status);
-        $response->getBody()->write(json_encode($objetoRetorno));
-
-        return $response->withHeader('Content-Type', 'application/json');	
+        return $retorno->withHeader('Content-Type', 'application/json');	
     }
 
     public static function ArmarTabla(array $lista, string $header) : string {
@@ -216,14 +212,10 @@ class MW {
         foreach($lista as $item) {
             $tabla .= "<tr>";
 
-            foreach ($item as $key => $value)
-            {
-                if ($key == "perfil") 
-                {
+            foreach ($item as $key => $value){
+                if ($key == "perfil") {
                     $tabla .= "<td><img src='{$value}' width=25px></td>";
-                } 
-                else 
-                {
+                } else {
                      $tabla .= "<td>{$value}</td>";
                 }
             }
@@ -240,7 +232,7 @@ class MW {
         $parametros = $request->getParsedBody();
 
         $objetoRetorno = new stdclass();
-        $objetoRetorno->mensaje = "El correo ya existen";
+        $objetoRetorno->mensaje = "Error. El correo ya existe. Ingrese otro.";
         $objetoRetorno->status = 403;
         $objetoUsuario = null;
 
@@ -248,8 +240,8 @@ class MW {
             $objetoUsuario = json_decode($parametros['usuario']);
 
             if(!Usuario::verificarCorreo($objetoUsuario)) {
-                $response = $handler->handle($request);
-                $contenidoAPI = (string) $response->getBody();
+                $retorno = $handler->handle($request);
+                $contenidoAPI = (string) $retorno->getBody();
                 $api_respuesta = json_decode($contenidoAPI);
                 $objetoRetorno->status = $api_respuesta->status;
             } else {
@@ -257,16 +249,14 @@ class MW {
             }
         }
 
-        $response = new ResponseMW();
-        $response = $response->withStatus($objetoRetorno->status);
-        $response->getBody()->write($contenidoAPI);
+        $retorno = new ResponseMW();
+        $retorno = $retorno->withStatus($objetoRetorno->status);
+        $retorno->getBody()->write($contenidoAPI);
 
-        return $response->withHeader('Content-Type', 'application/json');
+        return $retorno->withHeader('Content-Type', 'application/json');
     }
 
 }
-
-
 
 
 ?>

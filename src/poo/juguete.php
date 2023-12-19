@@ -11,16 +11,33 @@ class Juguete {
     public float $precio;
     public string $pathFoto;
 
+    public function agregar() : bool {
+        $retorno = false;
+
+        $conexion = AccesoDatos::dameUnObjetoAcceso();
+
+        $sql = $conexion->retornarConsulta("INSERT INTO juguetes (marca, precio, path_foto) VALUES(:marca, :precio, :path_foto)");
+        $sql->bindValue(':marca', $this->marca, PDO::PARAM_STR);
+        $sql->bindValue(':precio', (float)$this->precio, PDO::PARAM_INT);
+        $sql->bindValue(':path_foto', $this->pathFoto, PDO::PARAM_STR);
+
+        if($sql->execute()) {
+            $retorno = true;
+        }
+
+        return $retorno;
+    }
+
     public function agregarUno(Request $request, Response $response, array $args): Response {
-        $parametros = $request->getParsedBody();
+        $params = $request->getParsedBody();
 
-        $objetoRetorno = new stdclass();
-        $objetoRetorno->exito = false;
-        $objetoRetorno->mensaje = "No se pudo agregar el juguete";
-        $objetoRetorno->status = 418;
+        $obj = new stdclass();
+        $obj->exito = false;
+        $obj->mensaje = "Error al intentar agregar el juguete.";
+        $obj->status = 418;
 
-        if(isset($parametros["juguete_json"])) {
-            $objetoJuguete = json_decode($parametros["juguete_json"]);
+        if(isset($params["juguete_json"])) {
+            $objJuguete = json_decode($params["juguete_json"]);
             $archivos = $request->getUploadedFiles();
 
             $nombreAnterior = $archivos['foto']->getClientFilename();
@@ -29,76 +46,36 @@ class Juguete {
             $destino = "./src/fotos/";
             
             $juguete = new Juguete();
-            $juguete->marca = $objetoJuguete->marca;
-            $juguete->precio = (float)$objetoJuguete->precio;
+            $juguete->marca = $objJuguete->marca;
+            $juguete->precio = (float)$objJuguete->precio;
             $juguete->pathFoto = $destino . $juguete->marca . "." . $extension[0];
 
             $archivos['foto']->moveTo("." .  $juguete->pathFoto);
           
            if($juguete->agregar()) {
-                $objetoRetorno->exito = true;
-                $objetoRetorno->mensaje = "Juguete agregado";
-                $objetoRetorno->status = 200;
+                $obj->exito = true;
+                $obj->mensaje = "Juguete agregado correctamente.";
+                $obj->status = 200;
             }
         }
 
-        $newResponse = $response->withStatus($objetoRetorno->status);
-        $newResponse->getBody()->write(json_encode($objetoRetorno));
+        $retorno = $response->withStatus($obj->status);
+        $retorno->getBody()->write(json_encode($obj));
 
-        return $newResponse->withHeader('Content-Type', 'application/json');
+        return $retorno->withHeader('Content-Type', 'application/json');
     }
-
-    public function agregar() : bool {
-        $retorno = false;
-
-        $objetoAcceso = AccesoDatos::dameUnObjetoAcceso();
-
-        $consulta = $objetoAcceso->retornarConsulta("INSERT INTO juguetes (marca, precio, path_foto) VALUES(:marca, :precio, :path_foto)");
-
-        $consulta->bindValue(':marca', $this->marca, PDO::PARAM_STR);
-        $consulta->bindValue(':precio', (float)$this->precio, PDO::PARAM_INT);
-        $consulta->bindValue(':path_foto', $this->pathFoto, PDO::PARAM_STR);
-
-        if($consulta->execute()) {
-            $retorno = true;
-        }
-
-        return $retorno;
-    }
-
-    public function traerTodos(Request $request, Response $response, array $args): Response 
-	{
-        $objetoRetorno = new stdclass();
-        $objetoRetorno->exito = false;
-        $objetoRetorno->mensaje = "No se pudo traer la lista";
-        $objetoRetorno->tabla = "null";
-        $objetoRetorno->status = 424;
-
-		$listaUsuarios = Juguete::traer();
-
-        if(count($listaUsuarios) > 0) {
-            $objetoRetorno->exito = true;
-            $objetoRetorno->mensaje = "Listado de juguetes";
-            $objetoRetorno->tabla = json_encode($listaUsuarios);
-            $objetoRetorno->status = 200;
-        }
-  
-		$newResponse = $response->withStatus($objetoRetorno->status);
-        $newResponse->getBody()->write(json_encode($objetoRetorno));
-
-        return $newResponse->withHeader('Content-Type', 'application/json');	
-	}
 
     public static function traer() : array
     {
         $juguetes = array();
-        $objetoAcceso = AccesoDatos::dameUnObjetoAcceso();
 
-        $consulta = $objetoAcceso->retornarConsulta("SELECT id, marca AS marca, precio AS precio, path_foto AS path_foto FROM juguetes");
+        $conexion = AccesoDatos::dameUnObjetoAcceso();
 
-        $consulta->execute();
+        $sql = $conexion->retornarConsulta("SELECT id, marca AS marca, precio AS precio, path_foto AS path_foto FROM juguetes");
 
-        $filas = $consulta->fetchAll();
+        $sql->execute();
+
+        $filas = $sql->fetchAll();
 
         foreach($filas as $fila) {
             $juguete = new Juguete();
@@ -113,67 +90,109 @@ class Juguete {
         return $juguetes;
     }
 
+    public function traerTodos(Request $request, Response $response, array $args): Response 
+	{
+        $obj = new stdclass();
+        $obj->exito = false;
+        $obj->mensaje = "Error al intentar traer la lista";
+        $obj->tablaData = "null";
+        $obj->status = 424;
+
+		$listaUsuarios = Juguete::traer();
+
+        if(count($listaUsuarios) > 0) {
+            $obj->exito = true;
+            $obj->mensaje = "Juguetes:";
+            $obj->tablaData = json_encode($listaUsuarios);
+            $obj->status = 200;
+        }
+  
+		$retorno = $response->withStatus($obj->status);
+        $retorno->getBody()->write(json_encode($obj));
+
+        return $retorno->withHeader('Content-Type', 'application/json');	
+	}
+
+    public static function borrar(int $_id) : bool {
+        $retorno = false;
+
+        $conexion = AccesoDatos::dameUnObjetoAcceso(); 
+
+        $sql = $conexion->RetornarConsulta("DELETE FROM juguetes WHERE id = :id");	
+        $sql->bindValue(':id', $_id, PDO::PARAM_INT);		
+
+        $sql->execute();
+
+        if($sql->rowCount() > 0) {
+            $retorno = true;
+        }
+
+        return $retorno;
+    }
+
     public function borrarUno(Request $request, Response $response, array $args): Response {
-        $objetoRetorno = new stdclass();
-        $objetoRetorno->exito = false;
-        $objetoRetorno->mensaje = "No se pudo eliminar el juguete";
-        $objetoRetorno->status = 418;
+        $obj = new stdclass();
+        $obj->exito = false;
+        $obj->mensaje = "Error al intentar eliminar el juguete.";
+        $obj->status = 418;
 
         if(isset($request->getHeader('token')[0]) && isset($args['id'])) {
             $token = $request->getHeader('token')[0];
             $id = $args['id'];
 
-            $datosToken = Autentificadora::obtenerPayLoad($token);
-            $usuarioToken = json_decode($datosToken->payload->data->usuario);
+            $dataToken = Autentificadora::obtenerPayLoad($token);
+            $usuarioToken = json_decode($dataToken->payload->data->usuario);
             $perfilUsuario = $usuarioToken->perfil;
 
             if($perfilUsuario == "supervisor") {
                 if(Juguete::borrar($id)){
-                    $objetoRetorno->exito = true;
-                    $objetoRetorno->mensaje = "Juguete eliminado";
-                    $objetoRetorno->status = 200;
+                    $obj->exito = true;
+                    $obj->mensaje = "Juguete eliminado";
+                    $obj->status = 200;
                 } else {
-                    $objetoRetorno->mensaje = "El juguete no se encuentra en el listado";
+                    $obj->mensaje = "Error. El juguete no se encuentra en la lista";
                 }
             } else {
-                $objetoRetorno->mensaje = "No esta autorizado para eliminar juguetes, debe ser supervisor y usted es {$usuarioToken->perfil}";
+                $obj->mensaje = "No tiene autorizacion para eliminar juguetes, se necesita ser supervisor y usted es: {$usuarioToken->perfil}";
             }
         }
 
-        $newResponse = $response->withStatus(200, "OK");
-		$newResponse->getBody()->write(json_encode($objetoRetorno));	
+        $retorno = $response->withStatus(200, "OK");
+		$retorno->getBody()->write(json_encode($obj));	
 
-		return $newResponse->withHeader('Content-Type', 'application/json');
+		return $retorno->withHeader('Content-Type', 'application/json');
     }
 
-    public static function borrar(int $_id) : bool {
+    public function modificar() : bool {
         $retorno = false;
+        $conexion = AccesoDatos::dameUnObjetoAcceso();
 
-        $objetoAccesoDato = AccesoDatos::dameUnObjetoAcceso(); 
+        $sql = $conexion->retornarConsulta("UPDATE juguetes SET marca = :marca, precio = :precio, path_foto = :path_foto WHERE id = :id");
+        $sql->bindValue(':id', $this->id, PDO::PARAM_INT);
+        $sql->bindValue(':marca', $this->marca, PDO::PARAM_STR);
+        $sql->bindValue(':precio', (float)$this->precio, PDO::PARAM_INT);
+        $sql->bindValue(':path_foto', $this->pathFoto, PDO::PARAM_STR);
 
-       $consulta = $objetoAccesoDato->RetornarConsulta("DELETE FROM juguetes WHERE id = :id");	
-       $consulta->bindValue(':id', $_id, PDO::PARAM_INT);		
+        $sql->execute();
 
-       $consulta->execute();
+        if($sql->rowCount() > 0) {
+            $retorno = true;
+        }
 
-       if($consulta->rowCount() > 0) {
-           $retorno = true;
-       }
-
-       return $retorno;
+        return $retorno;
     }
 
     public function modificarUno(Request $request, Response $response, array $args): Response {
-        $parametros = $request->getParsedBody();
+        $params = $request->getParsedBody();
 
-        $objetoRetorno = new stdclass();
-        $objetoRetorno->exito = false;
-        $objetoRetorno->mensaje = "No se pudo agregar el juguete";
-        $objetoRetorno->status = 418;
+        $obj = new stdclass();
+        $obj->exito = false;
+        $obj->mensaje = "Error al intentar modificar el juguete.";
+        $obj->status = 418;
 
-        if(isset($request->getHeader('token')[0]) && isset($parametros["juguete"])) {
+        if(isset($request->getHeader('token')[0]) && isset($params["juguete"])) {
             $token = $request->getHeader('token')[0];
-            $objetoJuguete = json_decode($parametros["juguete"]);
+            $objetoJuguete = json_decode($params["juguete"]);
             $archivos = $request->getUploadedFiles();
 
             $nombreAnterior = $archivos['foto']->getClientFilename();
@@ -195,54 +214,32 @@ class Juguete {
 
             if($perfilUsuario == "supervisor") {
                 if($juguete->modificar()) {
-                    $objetoRetorno->exito = true;
-                    $objetoRetorno->mensaje = "Juguete modificado";
-                    $objetoRetorno->status = 200;
+                    $obj->exito = true;
+                    $obj->mensaje = "Juguete modificado";
+                    $obj->status = 200;
                 } else {
-                    $objetoRetorno->mensaje = "El juguete no se encuentra en el listado";
+                    $obj->mensaje = "Error. El juguete no se encuentra en la lista";
                 }
             } else {
-                $objetoRetorno->mensaje = "No esta autorizado para eliminar juguetes, debe ser supervisor y usted es {$usuarioToken->perfil}";
+                $obj->mensaje = "No tiene autorizacion para modificar juguetes, se necesita ser supervisor y usted es: {$usuarioToken->perfil}";
             }
         }
 
-        $newResponse = $response->withStatus($objetoRetorno->status);
-        $newResponse->getBody()->write(json_encode($objetoRetorno));
+        $retorno = $response->withStatus($obj->status);
+        $retorno->getBody()->write(json_encode($obj));
 
-        return $newResponse->withHeader('Content-Type', 'application/json');
-    }
-
-    public function modificar() : bool {
-        $retorno = false;
-
-        $objetoAcceso = AccesoDatos::dameUnObjetoAcceso();
-
-        $consulta = $objetoAcceso->retornarConsulta("UPDATE juguetes SET marca = :marca, precio = :precio, path_foto = :path_foto WHERE id = :id");
-
-        $consulta->bindValue(':id', $this->id, PDO::PARAM_INT);
-        $consulta->bindValue(':marca', $this->marca, PDO::PARAM_STR);
-        $consulta->bindValue(':precio', (float)$this->precio, PDO::PARAM_INT);
-        $consulta->bindValue(':path_foto', $this->pathFoto, PDO::PARAM_STR);
-
-        $consulta->execute();
-
-        if($consulta->rowCount() > 0) {
-            $retorno = true;
-        }
-
-        return $retorno;
+        return $retorno->withHeader('Content-Type', 'application/json');
     }
 
     public static function traerJuguete(int $id) {
-        $objetoAcceso = AccesoDatos::dameUnObjetoAcceso();
+        $conexion = AccesoDatos::dameUnObjetoAcceso();
 
-        $consulta = $objetoAcceso->retornarConsulta("SELECT * FROM juguetes WHERE id = :id");
+        $sql = $conexion->retornarConsulta("SELECT * FROM juguetes WHERE id = :id");
+        $sql->bindValue(":id", $id, PDO::PARAM_INT);
 
-        $consulta->bindValue(":id", $id, PDO::PARAM_INT);
+        $sql->execute();
 
-        $consulta->execute();
-
-        $juguete = $consulta->fetchObject('Juguete');
+        $juguete = $sql->fetchObject('Juguete');
         $juguete->pathFoto = $juguete->path_foto;
 
         return $juguete;

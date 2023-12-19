@@ -12,40 +12,38 @@ class Usuario {
     public string $clave;
     public string $nombre;
     public string $apellido;
-    public string $foto;
     public string $perfil;
+    public string $foto;
 
     public function traerTodos(Request $request, Response $response, array $args): Response {
-        $objetoRetorno = new stdclass();
-        $objetoRetorno->exito = false;
-        $objetoRetorno->mensaje = "No se pudo agregar el usuario";
-        $objetoRetorno->dato = "{}";
-        $objetoRetorno->status = 424;
+        $objRetorno = new stdclass();
+        $objRetorno->exito = false;
+        $objRetorno->mensaje = "Error al intentar agregar al usuario.";
+        $objRetorno->data = "{}";
+        $objRetorno->status = 424;
 
 		$listaUsuarios = Usuario::traer();
 
         if(count($listaUsuarios) > 0) {
-            $objetoRetorno->exito = true;
-            $objetoRetorno->mensaje = "Listado de usuarios";
-            $objetoRetorno->dato = json_encode($listaUsuarios);
-            $objetoRetorno->status = 200;
+            $objRetorno->exito = true;
+            $objRetorno->mensaje = "Usuarios:";
+            $objRetorno->data = json_encode($listaUsuarios);
+            $objRetorno->status = 200;
         }
   
-		$newResponse = $response->withStatus($objetoRetorno->status);
-        $newResponse->getBody()->write(json_encode($objetoRetorno));
+		$retorno = $response->withStatus($objRetorno->status);
+        $retorno->getBody()->write(json_encode($objRetorno));
 
-        return $newResponse->withHeader('Content-Type', 'application/json');	
+        return $retorno->withHeader('Content-Type', 'application/json');	
 	}
 
     public static function traer() : array {
         $usuarios = array();
-        $objetoAcceso = AccesoDatos::dameUnObjetoAcceso();
 
-        $consulta = $objetoAcceso->retornarConsulta("SELECT id, correo AS correo, clave AS clave, nombre AS nombre, apellido AS apellido, foto AS foto, perfil AS perfil FROM usuarios");
-
-        $consulta->execute();
-
-        $filas = $consulta->fetchAll();
+        $conexion = AccesoDatos::dameUnObjetoAcceso();
+        $sql = $conexion->retornarConsulta("SELECT id, correo AS correo, clave AS clave, nombre AS nombre, apellido AS apellido, foto AS foto, perfil AS perfil FROM usuarios");
+        $sql->execute();
+        $filas = $sql->fetchAll();
 
         foreach($filas as $fila) {
             $usuario = new Usuario();
@@ -64,15 +62,15 @@ class Usuario {
     }
 
     public function login(Request $request, Response $response, array $args): Response {
-        $parametros = $request->getParsedBody();
+        $params = $request->getParsedBody();
 
-        $objetoRetorno = new stdClass();
-        $objetoRetorno->exito = false;
-        $objetoRetorno->mensaje = "No se pudo encontrar el usuario";
-        $objetoRetorno->status = 424;
+        $objRetorno = new stdClass();
+        $objRetorno->exito = false;
+        $objRetorno->mensaje = "Error al intentar encontrar al usuario.";
+        $objRetorno->status = 424;
 
-        if(isset($parametros['user'])) {
-            $objeto = json_decode($parametros['user']);
+        if(isset($params['user'])) {
+            $objeto = json_decode($params['user']);
 
             $usuario = Usuario::verificar($objeto);
 
@@ -89,30 +87,30 @@ class Usuario {
                 $data->alumno = "Iannello Santiago";
                 $data->dni_alumno = "44195364";
 
-                $objetoRetorno->exito = true;
-                $objetoRetorno->mensaje = "Token creado!";
-                $objetoRetorno->jwt = Autentificadora::crearJWT($data, 120000);
-                $objetoRetorno->status = 200;
+                $objRetorno->exito = true;
+                $objRetorno->mensaje = "Token creado.";
+                $objRetorno->jwt = Autentificadora::crearJWT($data);
+                $objRetorno->status = 200;
             }
         }
 
-		$newResponse = $response->withStatus($objetoRetorno->status);
-        $newResponse->getBody()->write(json_encode($objetoRetorno));
+		$retorno = $response->withStatus($objRetorno->status);
+        $retorno->getBody()->write(json_encode($objRetorno));
 
-        return $newResponse->withHeader('Content-Type', 'application/json');
+        return $retorno->withHeader('Content-Type', 'application/json');
     }
 
     public static function verificar($objeto) : Usuario | null | bool {
         $usuario = null;
-        $objetoAcceso = AccesoDatos::dameUnObjetoAcceso();
+        $conexion = AccesoDatos::dameUnObjetoAcceso();
 
-        $consulta = $objetoAcceso->retornarConsulta("SELECT * FROM usuarios WHERE correo = :correo AND clave = :clave");
+        $sql = $conexion->retornarConsulta( "SELECT * FROM usuarios WHERE correo = :correo AND clave = :clave");
 
-        $consulta->bindValue(':correo', $objeto->correo, PDO::PARAM_STR);
-        $consulta->bindValue(':clave', $objeto->clave, PDO::PARAM_STR);
+        $sql->bindValue(':correo', $objeto->correo, PDO::PARAM_STR);
+        $sql->bindValue(':clave', $objeto->clave, PDO::PARAM_STR);
 
-        if($consulta->execute()) {
-            $usuario = $consulta->fetchObject('Usuario');
+        if($sql->execute()) {
+            $usuario = $sql->fetchObject('Usuario');
         }
 
         return $usuario;
@@ -120,88 +118,47 @@ class Usuario {
 
     public function verificarJWT(Request $request, Response $response, array $args): Response {
         $contenidoAPI = "";
-        $obj_respuesta = new stdClass();
-        $obj_respuesta->exito = false;
-        $obj_respuesta->status = 403;
+        $objRetorno = new stdClass();
+        $objRetorno->exito = false;
+        $objRetorno->status = 403;
 
         if (isset($request->getHeader("token")[0])) {
             $token = $request->getHeader("token")[0];
 
             $obj = Autentificadora::verificarJWT($token);
 
-            if ($obj->verificado) 
-            {
-                $obj_respuesta->exito = true;
-                $obj_respuesta->status = 200;
+            if ($obj->verificado) {
+                $objRetorno->exito = true;
+                $objRetorno->status = 200;
             }
 
-            $obj_respuesta->mensaje = $obj;
+            $objRetorno->mensaje = $obj;
         }
 
-        $contenidoAPI = json_encode($obj_respuesta);
+        $contenidoAPI = json_encode($objRetorno);
 
-        $response = $response->withStatus($obj_respuesta->status);
-        $response->getBody()->write($contenidoAPI);
+        $retorno = $response->withStatus($objRetorno->status);
+        $retorno->getBody()->write($contenidoAPI);
 
-        return $response->withHeader('Content-Type', 'application/json');
-    }
-
-    public function agregarUno(Request $request, Response $response, array $args): Response {
-        $parametros = $request->getParsedBody();
-
-        $objetoRetorno = new stdclass();
-        $objetoRetorno->exito = false;
-        $objetoRetorno->mensaje = "No se pudo agregar el usuario";
-        $objetoRetorno->status = 418;
-
-        if(isset($parametros["usuario"])){
-            $objetousuario = json_decode($parametros["usuario"]);
-            $archivos = $request->getUploadedFiles();
-            
-            $nombreAnterior = $archivos['foto']->getClientFilename();
-            $extension = explode(".", $nombreAnterior);
-            $extension = array_reverse($extension);
-            $destino = "./src/fotos/";
-
-            $usuario = new usuario();
-            $usuario->correo = $objetousuario->correo;
-            $usuario->clave = $objetousuario->clave;
-            $usuario->nombre = $objetousuario->nombre;
-            $usuario->apellido = $objetousuario->apellido;
-            $usuario->perfil = $objetousuario->perfil;
-            $usuario->foto = $destino . $usuario->correo . "." . $extension[0];
-
-            $archivos['foto']->moveTo("." .  $usuario->foto);
-
-            if($usuario->agregar()) {
-                 $objetoRetorno->exito = true;
-                 $objetoRetorno->mensaje = "Juguete agregado";
-                 $objetoRetorno->status = 200;
-            }
-        }
-
-        $newResponse = $response->withStatus($objetoRetorno->status);
-        $newResponse->getBody()->write(json_encode($objetoRetorno));
-
-        return $newResponse->withHeader('Content-Type', 'application/json');
+        return $retorno->withHeader('Content-Type', 'application/json');
     }
 
     public function agregar() : bool | int {
         $retorno = false;
 
-        $objetoAcceso = AccesoDatos::dameUnObjetoAcceso();
+        $conexion = AccesoDatos::dameUnObjetoAcceso();
 
-        $consulta = $objetoAcceso->retornarConsulta("INSERT INTO usuarios(correo, clave, nombre, apellido, perfil, foto)" . "VALUES(:correo, :clave, :nombre, :apellido, :perfil, :foto)");
+        $sql = $conexion->retornarConsulta("INSERT INTO usuarios(correo, clave, nombre, apellido, perfil, foto)" . "VALUES(:correo, :clave, :nombre, :apellido, :perfil, :foto)");
     
-        $consulta->bindValue(':correo', $this->correo, PDO::PARAM_STR);
-        $consulta->bindValue(':clave', $this->clave, PDO::PARAM_STR);
-        $consulta->bindValue(':nombre', $this->nombre, PDO::PARAM_STR);
-        $consulta->bindValue(':apellido', $this->apellido, PDO::PARAM_STR);
-        $consulta->bindValue(':perfil', $this->perfil, PDO::PARAM_STR);
-        $consulta->bindValue(':foto', $this->foto, PDO::PARAM_STR);
+        $sql->bindValue(':correo', $this->correo, PDO::PARAM_STR);
+        $sql->bindValue(':clave', $this->clave, PDO::PARAM_STR);
+        $sql->bindValue(':nombre', $this->nombre, PDO::PARAM_STR);
+        $sql->bindValue(':apellido', $this->apellido, PDO::PARAM_STR);
+        $sql->bindValue(':perfil', $this->perfil, PDO::PARAM_STR);
+        $sql->bindValue(':foto', $this->foto, PDO::PARAM_STR);
 
-        if($consulta->execute()) {
-            $retorno = $objetoAcceso->retornarUltimoIdInsertado();
+        if($sql->execute()) {
+            $retorno = $conexion->retornarUltimoIdInsertado();
         }
 
         return $retorno;
@@ -209,13 +166,13 @@ class Usuario {
 
     public static function verificarCorreo($objeto) : bool {
         $retorno = false;
-        $objetoAcceso = AccesoDatos::dameUnObjetoAcceso();
+        $conexion = AccesoDatos::dameUnObjetoAcceso();
         
-        $consulta = $objetoAcceso->retornarConsulta( "SELECT * FROM usuarios WHERE correo = :correo");
+        $sql = $conexion->retornarConsulta( "SELECT * FROM usuarios WHERE correo = :correo");
 
-        $consulta->bindValue(':correo', $objeto->correo, PDO::PARAM_STR);
+        $sql->bindValue(':correo', $objeto->correo, PDO::PARAM_STR);
 
-        if($consulta->execute()) {
+        if($sql->execute()) {
             $retorno = true;
         }
 
